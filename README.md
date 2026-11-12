@@ -74,13 +74,13 @@ See [`.env.example`](.env.example). Important variables:
 | `MFA_ENCRYPTION_KEY` | Exactly 32 random bytes encoded as base64                  |
 | `FRONTEND_ORIGINS`   | Comma-separated exact browser origins; never `*`           |
 | `APP_PUBLIC_URL`     | Trusted base URL used in email links                       |
-| `API_PUBLIC_URL`     | Public API URL used for OAuth callback URLs                 |
+| `API_PUBLIC_URL`     | Public API URL used for OAuth callback URLs                |
 | `COOKIE_SECURE`      | Must be `true` in production                               |
 | `TRUST_PROXY`        | `false`, `true`, or the exact trusted proxy hop count      |
 | `EMAIL_PROVIDER`     | `none` or `smtp`; `none` never claims delivery             |
-| `GOOGLE_CLIENT_ID`   | Optional Google OAuth client ID                             |
-| `GITHUB_CLIENT_ID`   | Optional GitHub OAuth client ID                             |
-| `WEBAUTHN_RP_ID`     | WebAuthn relying-party domain                               |
+| `GOOGLE_CLIENT_ID`   | Optional Google OAuth client ID                            |
+| `GITHUB_CLIENT_ID`   | Optional GitHub OAuth client ID                            |
+| `WEBAUTHN_RP_ID`     | WebAuthn relying-party domain                              |
 
 Generate secrets:
 
@@ -135,7 +135,7 @@ The frontend must keep the access token in memory, send it as `Authorization: Be
 | `PATCH`      | `/api/v1/auth/profile`         | Update display name                       |
 | `PUT`        | `/api/v1/auth/email`           | Start verified email change               |
 | `DELETE`     | `/api/v1/auth/account`         | Permanently delete an account             |
-| `POST`       | `/api/v1/auth/magic-link/*`    | Request/consume passwordless link          |
+| `POST`       | `/api/v1/auth/magic-link/*`    | Request/consume passwordless link         |
 | `GET/DELETE` | `/api/v1/sessions`             | List/revoke owned sessions                |
 | `GET`        | `/api/v1/sessions/analytics`   | Login history risk summary                |
 | `POST`       | `/api/v1/mfa/enroll`           | Start TOTP enrollment                     |

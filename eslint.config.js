@@ -3,7 +3,10 @@ import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'eslint.config.js'] },
+  {
+    // Temporary scratch entry point at the repo root; the real one will live in src/server.ts.
+    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'eslint.config.js', 'server.ts'],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,

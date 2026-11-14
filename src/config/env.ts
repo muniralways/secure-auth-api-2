@@ -1,9 +1,11 @@
+import 'dotenv/config';
+
 import { z } from 'zod';
 
 const booleanFromString = z.enum(['true', 'false']).transform((value) => value === 'true');
 
 const optionalString = z.preprocess(
-  (value) => (typeof value === 'string' ? value : undefined),
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
   z.string().min(1).optional(),
 );
 
@@ -14,7 +16,7 @@ const originsSchema = z.string().transform((value, context) => {
     .filter(Boolean);
 
   if (origins.length === 0) {
-    context.addIssue({ code: 'custom', message: 'FRONTEND_URL must contain at least one origin' });
+    context.addIssue({ code: 'custom', message: 'At least one frontend origin is required' });
     return z.NEVER;
   }
 
@@ -22,13 +24,11 @@ const originsSchema = z.string().transform((value, context) => {
     try {
       const url = new URL(origin);
       if (url.origin !== origin || !['http:', 'https:'].includes(url.protocol)) {
-        throw new Error(`Invalid origin : ${origin}`);
+        throw new Error('Origin must not contain a path');
       }
     } catch {
-      context.addIssue({
-        code: 'custom',
-        message: `FRONTEND_URL contains an invalid origin: ${origin}`,
-      });
+      context.addIssue({ code: 'custom', message: `Invalid frontend origin: ${origin}` });
+      return z.NEVER;
     }
   }
 
@@ -105,40 +105,93 @@ const envSchema = baseSchema.superRefine((env, context) => {
     if (!env.COOKIE_SECURE) {
       context.addIssue({
         code: 'custom',
-        message: 'COOKIE_SECURE must be true in production',
+        path: ['COOKIE_SECURE'],
+        message: 'Must be true in production',
       });
     }
-
-    if (!env.API_PUBLIC_URL?.startsWith('https://')) {
-      context.addIssue({
-        code: 'custom',
-        message: 'API_PUBLIC_URL must use HTTPS in production',
-      });
-    }
-
     if (!env.APP_PUBLIC_URL.startsWith('https://')) {
       context.addIssue({
         code: 'custom',
-        message: 'APP_PUBLIC_URL must use HTTPS in production',
+        path: ['APP_PUBLIC_URL'],
+        message: 'Must use HTTPS in production',
       });
     }
-
-    if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_HOST) {
+    if (env.API_PUBLIC_URL && !env.API_PUBLIC_URL.startsWith('https://')) {
       context.addIssue({
         code: 'custom',
-        message: 'SMTP_HOST must be set when EMAIL_PROVIDER is smtp in production',
-      });
-    }
-
-    if (env.EMAIL_PROVIDER === 'smtp' && env.SMTP_USER && !env.SMTP_PASSWORD) {
-      context.addIssue({
-        code: 'custom',
-        message: 'SMTP_PASSWORD must be set when SMTP_USER is set',
+        path: ['API_PUBLIC_URL'],
+        message: 'Must use HTTPS in production',
       });
     }
   }
+
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_HOST) {
+    context.addIssue({
+      code: 'custom',
+      path: ['SMTP_HOST'],
+      message: 'Required for SMTP delivery',
+    });
+  }
+  if (env.EMAIL_PROVIDER === 'smtp' && Boolean(env.SMTP_USER) !== Boolean(env.SMTP_PASSWORD)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['SMTP_PASSWORD'],
+      message: 'SMTP_USER and SMTP_PASSWORD must be provided together',
+    });
+  }
+  if (env.GOOGLE_CLIENT_ID && !env.GOOGLE_CLIENT_SECRET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['GOOGLE_CLIENT_SECRET'],
+      message: 'Required when GOOGLE_CLIENT_ID is set',
+    });
+  }
+  if ((env.GOOGLE_CLIENT_ID || env.GITHUB_CLIENT_ID) && !env.API_PUBLIC_URL) {
+    context.addIssue({
+      code: 'custom',
+      path: ['API_PUBLIC_URL'],
+      message: 'Required when an OAuth provider is configured',
+    });
+  }
+  if (!env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['GOOGLE_CLIENT_ID'],
+      message: 'Required when GOOGLE_CLIENT_SECRET is set',
+    });
+  }
+  if (env.GITHUB_CLIENT_ID && !env.GITHUB_CLIENT_SECRET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['GITHUB_CLIENT_SECRET'],
+      message: 'Required when GITHUB_CLIENT_ID is set',
+    });
+  }
+  if (!env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['GITHUB_CLIENT_ID'],
+      message: 'Required when GITHUB_CLIENT_SECRET is set',
+    });
+  }
+  if (env.WEBAUTHN_RP_ORIGIN && !env.WEBAUTHN_RP_ID) {
+    context.addIssue({
+      code: 'custom',
+      path: ['WEBAUTHN_RP_ID'],
+      message: 'Required when WEBAUTHN_RP_ORIGIN is set',
+    });
+  }
 });
 
-export const env = envSchema.parse(process.env);
+export type Env = z.infer<typeof envSchema>;
 
-export type Env = typeof env;
+export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
+  const result = envSchema.safeParse(source);
+  if (!result.success) {
+    const problems = result.error.issues
+      .map((issue) => `${issue.path.join('.') || 'environment'}: ${issue.message}`)
+      .join('; ');
+    throw new Error(`Invalid environment configuration: ${problems}`);
+  }
+  return result.data;
+}
